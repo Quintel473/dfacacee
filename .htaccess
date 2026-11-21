@@ -1,0 +1,11 @@
+# Disable directory listing
+Options -Indexes
+
+# Protect sensitive files
+<FilesMatch "^(db\.php|.*\.sql)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block access to includes folder from browser
+RedirectMatch 403 ^/includes/.*$
