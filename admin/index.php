@@ -7,20 +7,66 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-// Handle Actions
 $msg = '';
 $msgType = 'success';
 
-if (isset($_POST['update_status'])) {
-    $stmt = $pdo->prepare("UPDATE bookings SET payment_status = ? WHERE id = ?");
-    $stmt->execute([$_POST['status'], (int)$_POST['booking_id']]);
-    $msg = "Booking status updated.";
+// ─────────────────────────────────────────────
+// HELPER: Handle File Uploads Safely
+// ─────────────────────────────────────────────
+function handleUpload($fileInputName, $existingUrl = null) {
+    if (!isset($_FILES[$fileInputName]) || $_FILES[$fileInputName]['error'] !== UPLOAD_ERR_OK) {
+        return $existingUrl; 
+    }
+
+    $uploadDir = '../uploads/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $originalName = basename($_FILES[$fileInputName]['name']);
+    $cleanName = preg_replace("/[^a-zA-Z0-9.\-_]/", "", str_replace(' ', '_', $originalName));
+    $fileName = time() . '_' . $cleanName;
+    $targetPath = $uploadDir . $fileName;
+
+    if (move_uploaded_file($_FILES[$fileInputName]['tmp_name'], $targetPath)) {
+        return 'uploads/' . $fileName; 
+    } else {
+        return $existingUrl; 
+    }
+}
+
+// ─────────────────────────────────────────────
+// HANDLE ACTIONS
+// ─────────────────────────────────────────────
+
+if (isset($_POST['save_booking'])) {
+    $id = $_POST['booking_id'] ?? null;
+    $name = $_POST['full_name'];
+    $email = $_POST['email'];
+    $phone = $_POST['phone'];
+    $service = $_POST['service'];
+    $date = $_POST['booking_date'];
+    $time = $_POST['booking_time'];
+    $total = $_POST['total_price'];
+    $deposit = $_POST['deposit_paid'];
+    $status = $_POST['payment_status'];
+
+    if ($id) {
+        $stmt = $pdo->prepare("UPDATE bookings SET full_name=?, email=?, phone=?, service=?, booking_date=?, booking_time=?, total_price=?, deposit_paid=?, payment_status=? WHERE id=?");
+        $stmt->execute([$name, $email, $phone, $service, $date, $time, $total, $deposit, $status, $id]);
+        $msg = "Booking updated.";
+    } else {
+        $ref = "DF-" . str_pad(rand(1000, 9999), 5, '0', STR_PAD_LEFT);
+        $stmt = $pdo->prepare("INSERT INTO bookings (full_name, email, phone, service, booking_date, booking_time, total_price, deposit_paid, payment_status, booking_reference) VALUES (?,?,?,?,?,?,?,?,?,?)");
+        $stmt->execute([$name, $email, $phone, $service, $date, $time, $total, $deposit, $status, $ref]);
+        $msg = "Manual booking created.";
+    }
 }
 
 if (isset($_POST['delete_booking'])) {
     $stmt = $pdo->prepare("DELETE FROM bookings WHERE id = ?");
     $stmt->execute([(int)$_POST['booking_id']]);
-    $msg = "Booking deleted permanently.";
+    $msg = "Booking deleted.";
 }
 
 if (isset($_POST['save_service'])) {
@@ -31,14 +77,23 @@ if (isset($_POST['save_service'])) {
     $dur = $_POST['duration'];
     $icon = $_POST['icon'];
     $active = isset($_POST['is_active']) ? 1 : 0;
+    
+    $existingMedia = $_POST['existing_media'] ?? null;
+    $mediaUrl = handleUpload('media_file', $existingMedia);
+    $mediaType = 'image';
+
+    if ($mediaUrl) {
+        $ext = strtolower(pathinfo($mediaUrl, PATHINFO_EXTENSION));
+        if (in_array($ext, ['mp4', 'webm'])) $mediaType = 'video';
+    }
 
     if ($id) {
-        $stmt = $pdo->prepare("UPDATE services SET name=?, description=?, price=?, duration=?, icon=?, is_active=? WHERE id=?");
-        $stmt->execute([$name, $desc, $price, $dur, $icon, $active, $id]);
+        $stmt = $pdo->prepare("UPDATE services SET name=?, description=?, price=?, duration=?, icon=?, is_active=?, media_url=?, media_type=? WHERE id=?");
+        $stmt->execute([$name, $desc, $price, $dur, $icon, $active, $mediaUrl, $mediaType, $id]);
         $msg = "Service updated.";
     } else {
-        $stmt = $pdo->prepare("INSERT INTO services (name, description, price, duration, icon, is_active) VALUES (?,?,?,?,?,?)");
-        $stmt->execute([$name, $desc, $price, $dur, $icon, $active]);
+        $stmt = $pdo->prepare("INSERT INTO services (name, description, price, duration, icon, is_active, media_url, media_type) VALUES (?,?,?,?,?,?,?,?)");
+        $stmt->execute([$name, $desc, $price, $dur, $icon, $active, $mediaUrl, $mediaType]);
         $msg = "Service added.";
     }
 }
@@ -47,6 +102,39 @@ if (isset($_POST['delete_service'])) {
     $stmt = $pdo->prepare("DELETE FROM services WHERE id = ?");
     $stmt->execute([(int)$_POST['service_id']]);
     $msg = "Service deleted.";
+}
+
+if (isset($_POST['block_slot'])) {
+    $date = $_POST['block_date'];
+    $time = $_POST['block_time'] === 'full_day' ? null : $_POST['block_time'];
+    $stmt = $pdo->prepare("INSERT INTO blocked_slots (block_date, block_time, reason) VALUES (?, ?, ?)");
+    $stmt->execute([$date, $time, $_POST['reason']]);
+    $msg = "Time slot blocked.";
+}
+if (isset($_POST['unblock_slot'])) {
+    $stmt = $pdo->prepare("DELETE FROM blocked_slots WHERE id = ?");
+    $stmt->execute([(int)$_POST['block_id']]);
+    $msg = "Time slot unblocked.";
+}
+
+if (isset($_POST['save_content'])) {
+    if (isset($_POST['content'])) {
+        foreach ($_POST['content'] as $key => $value) {
+            $stmt = $pdo->prepare("UPDATE site_content SET content_value = ? WHERE content_key = ?");
+            $stmt->execute([$value, $key]);
+        }
+    }
+    
+    for ($i = 1; $i <= 6; $i++) {
+        $currentGalleryUrl = $_POST['existing_gallery_' . $i] ?? null;
+        $newUrl = handleUpload("gallery_$i", $currentGalleryUrl);
+        
+        if ($newUrl !== $currentGalleryUrl) {
+            $stmt = $pdo->prepare("REPLACE INTO site_content (content_key, content_value) VALUES (?, ?)");
+            $stmt->execute(["gallery_$i", $newUrl]);
+        }
+    }
+    $msg = "Site content updated.";
 }
 
 if (isset($_POST['change_password'])) {
@@ -79,15 +167,11 @@ $activeTab = $_GET['tab'] ?? 'bookings';
 <head>
     <meta charset="UTF-8">
     <title>Admin Dashboard | D'FACEEE</title>
-    
-    <!-- FIXED: Added the favicon here -->
     <link rel="icon" type="image/svg+xml" href="../assets/images/logo.svg">
     <link rel="stylesheet" href="../assets/css/style.css">
-    
     <style>
-        /* Admin Specific Styles */
         body { background: #f4f6f9; display: flex; min-height: 100vh; margin: 0; }
-        .sidebar { width: 260px; background: var(--black); color: white; padding: 30px 20px; min-height: 100vh; position: fixed; top:0; left:0; }
+        .sidebar { width: 260px; background: var(--black); color: white; padding: 30px 20px; min-height: 100vh; position: fixed; top:0; left:0; display: flex; flex-direction: column; }
         .sidebar h2 { font-family: 'Cinzel', serif; color: var(--gold); margin-bottom: 40px; text-align: center; font-size: 1.6rem; }
         .sidebar a { display: flex; align-items: center; gap: 12px; color: #bbb; text-decoration: none; padding: 14px 18px; border-radius: 8px; margin-bottom: 8px; font-weight: 600; transition: all 0.2s; }
         .sidebar a:hover, .sidebar a.active { background: rgba(255,255,255,0.08); color: var(--gold); }
@@ -102,7 +186,6 @@ $activeTab = $_GET['tab'] ?? 'bookings';
 
         .card { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); padding: 30px; margin-bottom: 30px; }
         
-        /* Tables */
         .table-responsive { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 15px; font-size: 0.8rem; text-transform: uppercase; color: #888; border-bottom: 2px solid #eee; }
@@ -114,7 +197,6 @@ $activeTab = $_GET['tab'] ?? 'bookings';
         .status-completed { background: #e8f5e9; color: #2e7d32; }
         .status-cancelled { background: #ffebee; color: #c62828; }
         
-        /* Buttons */
         .btn { padding: 10px 18px; border-radius: 6px; border: none; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: 0.2s; display: inline-block; text-decoration: none; }
         .btn-primary { background: var(--gold); color: white; }
         .btn-primary:hover { background: var(--gold-dark); }
@@ -122,18 +204,19 @@ $activeTab = $_GET['tab'] ?? 'bookings';
         .btn-danger:hover { background: #c62828; color: white; }
         .btn-sm { padding: 6px 12px; font-size: 0.75rem; }
         
-        /* Forms */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .form-grid .full { grid-column: 1 / -1; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 700; font-size: 0.85rem; color: #444; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 0.95rem; }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--gold); }
         
-        /* Service Cards in Admin */
         .svc-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
         .svc-admin-card { border: 1px solid #eee; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
         .svc-admin-header { display: flex; justify-content: space-between; align-items: start; }
-        .svc-admin-icon { font-size: 2rem; }
+        
+        .gallery-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+        .gallery-upload-box { border: 2px dashed #ccc; border-radius: 10px; padding: 20px; text-align: center; }
+        .gallery-upload-box img { width: 100%; height: 120px; object-fit: cover; border-radius: 6px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -141,17 +224,22 @@ $activeTab = $_GET['tab'] ?? 'bookings';
 <div class="sidebar">
     <h2>D'FACEEE</h2>
     <a href="?tab=bookings" class="<?= $activeTab==='bookings'?'active':'' ?>">📅 Bookings</a>
-    <a href="?tab=services" class="<?= $activeTab==='services'?'active':'' ?>">💎 Manage Services</a>
+    <a href="?tab=availability" class="<?= $activeTab==='availability'?'active':'' ?>">🚫 Block Time</a>
+    <a href="?tab=services" class="<?= $activeTab==='services'?'active':'' ?>">💎 Services</a>
+    <a href="?tab=content" class="<?= $activeTab==='content'?'active':'' ?>">🖼️ Site Content</a>
     <a href="?tab=password" class="<?= $activeTab==='password'?'active':'' ?>">⚙️ Settings</a>
-    <a href="../index.php" target="_blank">🌐 View Website</a>
-    <a href="logout.php" style="color: #e74c3c; margin-top: auto;">🚪 Logout</a>
+    <!-- Removed target="_blank" so it opens in the same tab -->
+    <a href="../index.php" style="margin-top: auto;">🌐 View Website</a>
+    <a href="logout.php" style="color: #e74c3c;">🚪 Logout</a>
 </div>
 
 <div class="main-content">
     <div class="top-bar">
-        <h1><?= $activeTab === 'bookings' ? 'Bookings' : ($activeTab === 'services' ? 'Services' : 'Settings') ?></h1>
-        <?php if ($activeTab === 'services'): ?>
-            <button onclick="document.getElementById('addSvcForm').style.display='block'" class="btn btn-primary">+ Add New Service</button>
+        <h1><?= ucfirst($activeTab) ?></h1>
+        <?php if ($activeTab === 'bookings'): ?>
+            <button onclick="document.getElementById('addBookingForm').style.display='block'" class="btn btn-primary">+ Manual Booking</button>
+        <?php elseif ($activeTab === 'services'): ?>
+            <button onclick="document.getElementById('addSvcForm').style.display='block'" class="btn btn-primary">+ Add Service</button>
         <?php endif; ?>
     </div>
 
@@ -159,13 +247,13 @@ $activeTab = $_GET['tab'] ?? 'bookings';
         <div class="alert <?= $msgType ?>"><?= $msg ?></div>
     <?php endif; ?>
 
-    <!-- ═══════════ BOOKINGS TAB ═══════════ -->
+    <!-- BOOKINGS TAB -->
     <?php if ($activeTab === 'bookings'): ?>
         <div class="card table-responsive">
             <table>
                 <thead>
                     <tr>
-                        <th>Ref</th><th>Client Details</th><th>Service</th><th>Schedule</th><th>Financials</th><th>Status</th><th>Actions</th>
+                        <th>Ref</th><th>Client</th><th>Service</th><th>Schedule</th><th>Financials</th><th>Status</th><th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -178,37 +266,130 @@ $activeTab = $_GET['tab'] ?? 'bookings';
                     ?>
                     <tr>
                         <td><strong><?= htmlspecialchars($row['booking_reference'] ?? 'DF-'.$row['id']) ?></strong></td>
-                        <td>
-                            <strong><?= htmlspecialchars($row['full_name']) ?></strong><br>
-                            <small><?= htmlspecialchars($row['phone']) ?></small><br>
-                            <small><?= htmlspecialchars($row['email']) ?></small>
-                        </td>
-                        <td>
-                            <?= htmlspecialchars($row['service']) ?><br>
-                            <small>Stylist: <?= htmlspecialchars($row['stylist_preference']) ?></small>
-                            <?php if($row['special_notes']): ?>
-                                <br><small style="color: #888; font-style: italic;">"<?= htmlspecialchars($row['special_notes']) ?>"</small>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?= date('M d, Y', strtotime($row['booking_date'])) ?><br>
-                            <small><?= date('h:i A', strtotime($row['booking_time'])) ?></small>
-                        </td>
-                        <td>
-                            Total: $<?= $row['total_price'] ?><br>
-                            <small style="color:#27ae60;">Dep: $<?= $row['deposit_paid'] ?></small>
-                        </td>
+                        <td><strong><?= htmlspecialchars($row['full_name']) ?></strong><br><small><?= htmlspecialchars($row['phone']) ?></small></td>
+                        <td><?= htmlspecialchars($row['service']) ?></td>
+                        <td><?= date('M d, Y', strtotime($row['booking_date'])) ?> <br><small><?= date('h:i A', strtotime($row['booking_time'])) ?></small></td>
+                        <td>Total: $<?= $row['total_price'] ?><br><small style="color:#27ae60;">Dep: $<?= $row['deposit_paid'] ?></small></td>
                         <td><span class="status-badge <?= $statusClass ?>"><?= $row['payment_status'] ?></span></td>
                         <td>
                             <div style="display: flex; gap: 5px;">
+                                <button onclick='editBooking(<?= json_encode($row) ?>)' class="btn btn-sm" style="background:#eee;">Edit</button>
                                 <?php if($row['payment_status'] !== 'Completed'): ?>
-                                    <form method="POST"><input type="hidden" name="booking_id" value="<?= $row['id'] ?>"><input type="hidden" name="status" value="Completed"><button type="submit" name="update_status" class="btn btn-sm btn-primary">Mark Done</button></form>
+                                    <form method="POST"><input type="hidden" name="booking_id" value="<?= $row['id'] ?>"><input type="hidden" name="status" value="Completed"><button type="submit" name="save_booking" class="btn btn-sm btn-primary">Done</button></form>
                                 <?php endif; ?>
-                                <?php if($row['payment_status'] !== 'Cancelled'): ?>
-                                    <form method="POST" onsubmit="return confirm('Cancel this booking?');"><input type="hidden" name="booking_id" value="<?= $row['id'] ?>"><input type="hidden" name="status" value="Cancelled"><button type="submit" name="update_status" class="btn btn-sm" style="background:#eee; color:#666;">Cancel</button></form>
-                                <?php endif; ?>
-                                <form method="POST" onsubmit="return confirm('DELETE permanently? This cannot be undone.');"><input type="hidden" name="booking_id" value="<?= $row['id'] ?>"><button type="submit" name="delete_booking" class="btn btn-sm btn-danger">Delete</button></form>
+                                <form method="POST" onsubmit="return confirm('DELETE permanently?');"><input type="hidden" name="booking_id" value="<?= $row['id'] ?>"><button type="submit" name="delete_booking" class="btn btn-sm btn-danger">X</button></form>
                             </div>
+                        </td>
+                    </tr>
+                    <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card" id="addBookingForm" style="display: none; border-left: 4px solid var(--gold);">
+            <h3 style="margin-bottom: 20px;">Manual Booking</h3>
+            <form method="POST">
+                <input type="hidden" name="booking_id" id="b_id">
+                <div class="form-grid">
+                    <div class="form-group"><label>Client Name</label><input type="text" name="full_name" id="b_name" required></div>
+                    <div class="form-group"><label>Phone</label><input type="text" name="phone" id="b_phone" required></div>
+                    <div class="form-group"><label>Email</label><input type="email" name="email" id="b_email" required></div>
+                    <div class="form-group"><label>Service</label>
+                        <select name="service" id="b_service" required>
+                            <?php 
+                            $svcs = $pdo->query("SELECT name, price FROM services")->fetchAll();
+                            foreach($svcs as $s) echo "<option value='{$s['name']}' data-price='{$s['price']}'>{$s['name']}</option>";
+                            ?>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Date</label><input type="date" name="booking_date" id="b_date" required></div>
+                    <div class="form-group"><label>Time</label><input type="time" name="booking_time" id="b_time" required></div>
+                    <div class="form-group"><label>Total ($)</label><input type="number" step="0.01" name="total_price" id="b_total" required></div>
+                    <div class="form-group"><label>Deposit ($)</label><input type="number" step="0.01" name="deposit_paid" id="b_dep" required></div>
+                    <div class="form-group"><label>Status</label>
+                        <select name="payment_status" id="b_status">
+                            <option value="Paid">Paid</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" name="save_booking" class="btn btn-primary" style="margin-top: 15px;">Save Booking</button>
+                <button type="button" onclick="document.getElementById('addBookingForm').style.display='none'" class="btn" style="background:#eee; margin-top: 15px;">Cancel</button>
+            </form>
+        </div>
+        <script>
+            function editBooking(data) {
+                document.getElementById('addBookingForm').style.display = 'block';
+                document.getElementById('b_id').value = data.id;
+                document.getElementById('b_name').value = data.full_name;
+                document.getElementById('b_phone').value = data.phone;
+                document.getElementById('b_email').value = data.email;
+                document.getElementById('b_service').value = data.service;
+                document.getElementById('b_date').value = data.booking_date;
+                document.getElementById('b_time').value = data.booking_time;
+                document.getElementById('b_total').value = data.total_price;
+                document.getElementById('b_dep').value = data.deposit_paid;
+                document.getElementById('b_status').value = data.payment_status;
+                document.getElementById('addBookingForm').scrollIntoView();
+            }
+        </script>
+    <?php endif; ?>
+
+    <!-- AVAILABILITY TAB -->
+    <?php if ($activeTab === 'availability'): ?>
+        <div class="card">
+            <h3 style="margin-bottom: 20px;">Block a Date or Time</h3>
+            <form method="POST" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="form-group" style="flex: 1; min-width: 150px; margin:0;">
+                    <label>Date to Block</label>
+                    <input type="date" name="block_date" required>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 150px; margin:0;">
+                    <label>Time (or Full Day)</label>
+                    <select name="block_time">
+                        <option value="full_day">Full Day</option>
+                        <option value="05:00">5:00 AM</option>
+                        <option value="06:00">6:00 AM</option>
+                        <option value="07:00">7:00 AM</option>
+                        <option value="15:00">3:00 PM</option>
+                        <option value="16:00">4:00 PM</option>
+                        <option value="17:00">5:00 PM</option>
+                        <option value="18:00">6:00 PM</option>
+                        <option value="19:00">7:00 PM</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 2; min-width: 200px; margin:0;">
+                    <label>Reason (Internal)</label>
+                    <input type="text" name="reason" placeholder="e.g., Personal appointment" required>
+                </div>
+                <button type="submit" name="block_slot" class="btn btn-primary" style="height: 42px;">Block Time</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom: 20px;">Currently Blocked</h3>
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>Time</th><th>Reason</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $stmt = $pdo->query("SELECT * FROM blocked_slots WHERE block_date >= CURDATE() ORDER BY block_date ASC, block_time ASC");
+                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)):
+                    ?>
+                    <tr>
+                        <td><strong><?= date('M d, Y', strtotime($row['block_date'])) ?></strong></td>
+                        <td>
+                            <?php if($row['block_time'] === null): ?>
+                                <span class="status-badge status-cancelled">Full Day</span>
+                            <?php else: ?>
+                                <?= date('h:i A', strtotime($row['block_time'])) ?>
+                            <?php endif; ?>
+                        </td>
+                        <td><?= htmlspecialchars($row['reason']) ?></td>
+                        <td>
+                            <form method="POST"><input type="hidden" name="block_id" value="<?= $row['id'] ?>"><button type="submit" name="unblock_slot" class="btn btn-sm btn-danger">Unblock</button></form>
                         </td>
                     </tr>
                     <?php endwhile; ?>
@@ -217,18 +398,25 @@ $activeTab = $_GET['tab'] ?? 'bookings';
         </div>
     <?php endif; ?>
 
-    <!-- ═══════════ SERVICES TAB ═══════════ -->
+    <!-- SERVICES TAB -->
     <?php if ($activeTab === 'services'): ?>
         <div class="card" id="addSvcForm" style="display: none; border-left: 4px solid var(--gold);">
-            <h3 style="margin-bottom: 20px;">Add New Service</h3>
-            <form method="POST">
+            <h3 style="margin-bottom: 20px;">Add Service</h3>
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="service_id" id="s_id">
                 <div class="form-grid">
-                    <div class="form-group"><label>Service Name</label><input type="text" name="name" required></div>
-                    <div class="form-group"><label>Price ($)</label><input type="number" step="0.01" name="price" required></div>
-                    <div class="form-group"><label>Duration (e.g. 60 mins)</label><input type="text" name="duration" required></div>
-                    <div class="form-group"><label>Emoji Icon</label><input type="text" name="icon" placeholder="💄" maxlength="5"></div>
-                    <div class="form-group full"><label>Description</label><textarea name="description" rows="3" required></textarea></div>
-                    <div class="form-group full"><label><input type="checkbox" name="is_active" checked> Active (visible on site)</label></div>
+                    <div class="form-group"><label>Service Name</label><input type="text" name="name" id="s_name" required></div>
+                    <div class="form-group"><label>Price ($)</label><input type="number" step="0.01" name="price" id="s_price" required></div>
+                    <div class="form-group"><label>Duration</label><input type="text" name="duration" id="s_dur" required></div>
+                    <div class="form-group"><label>Icon Key (soft-glam, bridal-glam, etc.)</label><input type="text" name="icon" id="s_icon" placeholder="default" required></div>
+                    <div class="form-group full"><label>Description</label><textarea name="description" id="s_desc" rows="3" required></textarea></div>
+                    <div class="form-group full">
+                        <label>Upload Media (Image or Video)</label>
+                        <input type="file" name="media_file" accept="image/*,video/*">
+                        <input type="hidden" name="existing_media" id="s_existing_media">
+                        <div id="mediaPreview" style="margin-top: 10px;"></div>
+                    </div>
+                    <div class="form-group full"><label><input type="checkbox" name="is_active" id="s_active" checked> Active (visible on site)</label></div>
                 </div>
                 <button type="submit" name="save_service" class="btn btn-primary" style="margin-top: 15px;">Save Service</button>
                 <button type="button" onclick="document.getElementById('addSvcForm').style.display='none'" class="btn" style="background:#eee; margin-top: 15px;">Cancel</button>
@@ -242,17 +430,23 @@ $activeTab = $_GET['tab'] ?? 'bookings';
             ?>
             <div class="svc-admin-card">
                 <div class="svc-admin-header">
-                    <span class="svc-admin-icon"><?= $svc['icon'] ?></span>
+                    <span class="svc-admin-icon" style="color: var(--gold); width: 30px; height: 30px;">
+                        <?php require_once '../includes/icons.php'; echo getServiceIcon($svc['icon']); ?>
+                    </span>
                     <span style="font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; background: <?= $svc['is_active'] ? '#e8f5e9; color:#2e7d32' : '#eee; color:#888' ?>;">
                         <?= $svc['is_active'] ? 'Active' : 'Hidden' ?>
                     </span>
                 </div>
                 <h4 style="font-size: 1.1rem; margin: 0;"><?= htmlspecialchars($svc['name']) ?></h4>
-                <p style="font-size: 0.85rem; color: #666; margin: 0; flex-grow: 1;"><?= htmlspecialchars($svc['description']) ?></p>
-                <div style="font-weight: bold; color: var(--gold);">$<?= number_format($svc['price'], 2) ?> &middot; <?= $svc['duration'] ?></div>
+                <?php if ($svc['media_url']): ?>
+                    <small style="color: var(--gold);">✓ Media Uploaded</small>
+                <?php else: ?>
+                    <small style="color: #888;">No media</small>
+                <?php endif; ?>
+                <div style="font-weight: bold; color: var(--gold);">$<?= number_format($svc['price'], 2) ?></div>
                 
                 <div style="display: flex; gap: 10px; margin-top: 10px; border-top: 1px solid #eee; padding-top: 15px;">
-                    <button onclick="editService(<?= htmlspecialchars(json_encode($svc)) ?>)" class="btn btn-sm btn-primary" style="flex: 1;">Edit</button>
+                    <button onclick='editService(<?= json_encode($svc) ?>)' class="btn btn-sm btn-primary" style="flex: 1;">Edit</button>
                     <form method="POST" onsubmit="return confirm('Delete this service?');" style="flex: 1;">
                         <input type="hidden" name="service_id" value="<?= $svc['id'] ?>">
                         <button type="submit" name="delete_service" class="btn btn-sm btn-danger" style="width: 100%;">Delete</button>
@@ -262,39 +456,68 @@ $activeTab = $_GET['tab'] ?? 'bookings';
             <?php endwhile; ?>
         </div>
 
-        <div class="card" id="editSvcForm" style="display: none; border-left: 4px solid var(--gold); margin-top: 30px;">
-            <h3 style="margin-bottom: 20px;">Edit Service</h3>
-            <form method="POST">
-                <input type="hidden" name="service_id" id="edit_id">
-                <div class="form-grid">
-                    <div class="form-group"><label>Service Name</label><input type="text" name="name" id="edit_name" required></div>
-                    <div class="form-group"><label>Price ($)</label><input type="number" step="0.01" name="price" id="edit_price" required></div>
-                    <div class="form-group"><label>Duration</label><input type="text" name="duration" id="edit_duration" required></div>
-                    <div class="form-group"><label>Emoji Icon</label><input type="text" name="icon" id="edit_icon" maxlength="5"></div>
-                    <div class="form-group full"><label>Description</label><textarea name="description" id="edit_description" rows="3" required></textarea></div>
-                    <div class="form-group full"><label><input type="checkbox" name="is_active" id="edit_active"> Active (visible on site)</label></div>
-                </div>
-                <button type="submit" name="save_service" class="btn btn-primary" style="margin-top: 15px;">Update Service</button>
-                <button type="button" onclick="document.getElementById('editSvcForm').style.display='none'" class="btn" style="background:#eee; margin-top: 15px;">Cancel</button>
-            </form>
-        </div>
-
         <script>
             function editService(svc) {
-                document.getElementById('edit_id').value = svc.id;
-                document.getElementById('edit_name').value = svc.name;
-                document.getElementById('edit_price').value = svc.price;
-                document.getElementById('edit_duration').value = svc.duration;
-                document.getElementById('edit_icon').value = svc.icon;
-                document.getElementById('edit_description').value = svc.description;
-                document.getElementById('edit_active').checked = svc.is_active == 1;
-                document.getElementById('editSvcForm').style.display = 'block';
-                document.getElementById('editSvcForm').scrollIntoView({ behavior: 'smooth' });
+                document.getElementById('addSvcForm').style.display = 'block';
+                document.getElementById('s_id').value = svc.id;
+                document.getElementById('s_name').value = svc.name;
+                document.getElementById('s_price').value = svc.price;
+                document.getElementById('s_dur').value = svc.duration;
+                document.getElementById('s_icon').value = svc.icon;
+                document.getElementById('s_desc').value = svc.description;
+                document.getElementById('s_active').checked = svc.is_active == 1;
+                document.getElementById('s_existing_media').value = svc.media_url || '';
+                
+                let preview = document.getElementById('mediaPreview');
+                if (svc.media_url) {
+                    preview.innerHTML = `<img src="../${svc.media_url}" style="height: 60px; border-radius: 4px;"> <br><small>Current media</small>`;
+                } else {
+                    preview.innerHTML = '';
+                }
+                document.getElementById('addSvcForm').scrollIntoView({ behavior: 'smooth' });
             }
         </script>
     <?php endif; ?>
 
-    <!-- ═══════════ SETTINGS TAB ═══════════ -->
+    <!-- CONTENT TAB -->
+    <?php if ($activeTab === 'content'): ?>
+        <?php
+        $contentStmt = $pdo->query("SELECT * FROM site_content");
+        $content = [];
+        while ($row = $contentStmt->fetch(PDO::FETCH_ASSOC)) $content[$row['content_key']] = $row['content_value'];
+        ?>
+        <form method="POST" enctype="multipart/form-data">
+            <div class="card">
+                <h3 style="margin-bottom: 20px;">Hero Section</h3>
+                <div class="form-group">
+                    <label>Hero Subtitle / Description</label>
+                    <textarea name="content[hero_text]" rows="3"><?= htmlspecialchars($content['hero_text'] ?? 'Where looks says it all. Experience luxury beauty treatments tailored to your unique glow.') ?></textarea>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="margin-bottom: 20px;">My Work Gallery (Upload up to 6 images)</h3>
+                <div class="gallery-admin-grid">
+                    <?php for ($i = 1; $i <= 6; $i++): ?>
+                        <div class="gallery-upload-box">
+                            <?php if (!empty($content["gallery_$i"])): ?>
+                                <img src="../<?= htmlspecialchars($content["gallery_$i"]) ?>" alt="Gallery <?= $i ?>">
+                                <input type="hidden" name="existing_gallery_<?= $i ?>" value="<?= htmlspecialchars($content["gallery_$i"]) ?>">
+                            <?php else: ?>
+                                <div style="height: 120px; display: flex; align-items: center; justify-content: center; background: #eee; border-radius: 6px; margin-bottom: 10px; color: #aaa;">Empty Slot</div>
+                            <?php endif; ?>
+                            <label style="font-size: 0.8rem; font-weight: bold;">Upload Image <?= $i ?></label>
+                            <input type="file" name="gallery_<?= $i ?>" accept="image/*" style="font-size: 0.8rem; margin-top: 5px;">
+                        </div>
+                    <?php endfor; ?>
+                </div>
+            </div>
+            
+            <button type="submit" name="save_content" class="btn btn-primary" style="padding: 15px 30px; font-size: 1rem;">Save All Content</button>
+        </form>
+    <?php endif; ?>
+
+    <!-- SETTINGS TAB -->
     <?php if ($activeTab === 'password'): ?>
         <div class="card" style="max-width: 500px;">
             <h3 style="margin-bottom: 20px;">Change Password</h3>

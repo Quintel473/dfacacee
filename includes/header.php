@@ -16,7 +16,7 @@ $base = $isSubfolder ? '../' : '';
 
 <nav class="navbar">
     <a href="<?php echo $base; ?>index.php" class="nav-logo">D'FACEEE</a>
-    <div class="nav-links" style="display: flex; gap: 15px; align-items: center;">
+    <div class="nav-links" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; justify-content: center;">
         <?php if ($currentPage !== 'booking.php' && $currentPage !== 'checkout.php'): ?>
             <a href="<?php echo $base; ?>pages/booking.php" class="btn-nav">Book Now</a>
         <?php else: ?>

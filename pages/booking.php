@@ -1,5 +1,6 @@
 <?php
 require '../includes/db.php';
+require '../includes/icons.php'; // Include SVG library
 $pageTitle = "Book Appointment | D'FACEEE";
 include '../includes/header.php';
 
@@ -19,42 +20,37 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="step" id="step4-indicator">4</div>
             </div>
 
-            <form id="bookingWizard" action="checkout.php" method="POST" novalidate>
-
+            <form id="bookingWizard" action="checkout.php" method="POST">
+                
                 <!-- STEP 1: Select Service -->
                 <div class="form-step active" id="step1">
                     <h2 class="step-title">Select Your Service</h2>
                     <div class="service-grid">
-                        <?php foreach ($services as $svc): ?>
-                            <div class="service-card"
-                                 role="button"
-                                 tabindex="0"
-                                 data-name="<?php echo htmlspecialchars($svc['name'], ENT_QUOTES); ?>"
-                                 data-price="<?php echo htmlspecialchars($svc['price'], ENT_QUOTES); ?>"
-                                 data-duration="<?php echo htmlspecialchars($svc['duration'], ENT_QUOTES); ?>"
-                                 data-icon="<?php echo htmlspecialchars($svc['icon'], ENT_QUOTES); ?>">
-                                <div class="svc-icon"><?php echo htmlspecialchars($svc['icon']); ?></div>
+                        <?php foreach($services as $svc): ?>
+                            <div class="service-card" onclick="selectService(this, '<?php echo htmlspecialchars($svc['name']); ?>', <?php echo $svc['price']; ?>, '<?php echo htmlspecialchars($svc['duration']); ?>')">
+                                <div class="svc-icon">
+                                    <?php echo getServiceIcon($svc['icon']); ?>
+                                </div>
                                 <h4><?php echo htmlspecialchars($svc['name']); ?></h4>
                                 <p class="svc-desc"><?php echo htmlspecialchars($svc['description']); ?></p>
                                 <div class="svc-meta">
                                     <span class="svc-price">$<?php echo number_format($svc['price'], 2); ?></span>
-                                    <span class="svc-duration">⏱ <?php echo htmlspecialchars($svc['duration']); ?></span>
+                                    <span class="svc-duration"><?php echo htmlspecialchars($svc['duration']); ?></span>
                                 </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
-                    <input type="hidden" name="service" id="selectedService">
-                    <input type="hidden" name="total_price" id="selectedPrice">
-                    <input type="hidden" name="service_duration" id="selectedDuration">
-                    <p class="step-error" id="step1-error" style="display:none; color:#c0392b; margin-top:10px;"></p>
+                    <input type="hidden" name="service" id="selectedService" required>
+                    <input type="hidden" name="total_price" id="selectedPrice" required>
+                    <input type="hidden" name="service_duration" id="selectedDuration" required>
                     <div class="btn-group">
-                        <button type="button" class="btn-next" onclick="nextStep(1)">Next: Date &amp; Time</button>
+                        <button type="button" class="btn-next" onclick="nextStep(1)">Next: Date & Time</button>
                     </div>
                 </div>
 
                 <!-- STEP 2: Date & Time -->
                 <div class="form-step" id="step2">
-                    <h2 class="step-title">Choose Date &amp; Time</h2>
+                    <h2 class="step-title">Choose Date & Time</h2>
                     <div class="form-group">
                         <label for="date">Preferred Date</label>
                         <input type="date" id="date" name="booking_date" required>
@@ -66,7 +62,6 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </select>
                         <small id="availabilityNote" style="display:none; color: var(--gold); font-size: 0.85rem; margin-top: 5px;"></small>
                     </div>
-                    <p class="step-error" id="step2-error" style="display:none; color:#c0392b; margin-top:10px;"></p>
                     <div class="btn-group">
                         <button type="button" class="btn-prev" onclick="prevStep(2)">Back</button>
                         <button type="button" class="btn-next" onclick="nextStep(2)">Next: Your Details</button>
@@ -91,14 +86,6 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <input type="email" id="email" name="email" required placeholder="jane@example.com">
                     </div>
                     <div class="form-group">
-                        <label for="stylist">Stylist Preference</label>
-                        <select id="stylist" name="stylist_preference">
-                            <option value="No Preference">No Preference (First Available)</option>
-                            <option value="Shamy">Shamy (Lead Artist)</option>
-                            <option value="Guest Artist">Guest Artist</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
                         <label for="notes">Special Requests / Notes (Optional)</label>
                         <textarea id="notes" name="special_notes" rows="3" placeholder="Allergies, skin concerns, event type, inspiration photos..."></textarea>
                     </div>
@@ -111,21 +98,8 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <!-- STEP 4: Review -->
                 <div class="form-step" id="step4">
                     <h2 class="step-title">Review Your Booking</h2>
-
+                    
                     <div class="review-badge">Please confirm your details below</div>
-
-                    <div class="review-details">
-                        <div class="summary-item"><span class="summary-label">Service</span><span class="summary-value" id="reviewService"></span></div>
-                        <div class="summary-item"><span class="summary-label">Duration</span><span class="summary-value" id="reviewDuration"></span></div>
-                        <div class="summary-item"><span class="summary-label">Date &amp; Time</span><span class="summary-value" id="reviewDateTime"></span></div>
-                        <div class="summary-item"><span class="summary-label">Name</span><span class="summary-value" id="reviewName"></span></div>
-                        <div class="summary-item"><span class="summary-label">Phone</span><span class="summary-value" id="reviewPhone"></span></div>
-                        <div class="summary-item"><span class="summary-label">Email</span><span class="summary-value" id="reviewEmail"></span></div>
-                        <div class="summary-item"><span class="summary-label">Stylist</span><span class="summary-value" id="reviewStylist"></span></div>
-                        <div class="summary-item"><span class="summary-label">Notes</span><span class="summary-value" id="reviewNotes"></span></div>
-                        <div class="summary-item"><span class="summary-label">Total</span><span class="summary-value" id="reviewTotal"></span></div>
-                        <div class="summary-item total-highlight"><span class="summary-label">Deposit due now (50%)</span><span class="summary-value" id="reviewDeposit"></span></div>
-                    </div>
 
                     <div class="policy-box">
                         <strong>Booking Policy:</strong>
@@ -167,9 +141,9 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <span class="summary-label">Time</span>
                 <span class="summary-value" id="sideTime">-</span>
             </div>
-
+            
             <div class="summary-divider"></div>
-
+            
             <div class="summary-item">
                 <span class="summary-label">Total Price</span>
                 <span class="summary-value" id="sidePrice">$0.00</span>
