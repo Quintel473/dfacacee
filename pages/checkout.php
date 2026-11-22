@@ -1,15 +1,15 @@
 <?php
 session_start();
 require '../includes/db.php';
-require '../includes/availability.php';
+require '../includes/availability.php'; // Assuming you have this from earlier
 
 if ($_SERVER["REQUEST_METHOD"] != "POST") {
     header("Location: booking.php");
     exit;
 }
 
-// Server-side slot re-check (critical - user could have been on payment screen for minutes)
-if (isSlotBooked($pdo, $_POST['booking_date'], $_POST['booking_time'])) {
+// Server-side slot re-check (critical)
+if (function_exists('isSlotBooked') && isSlotBooked($pdo, $_POST['booking_date'], $_POST['booking_time'])) {
     die("
         <div style='font-family: sans-serif; text-align:center; padding: 60px;'>
             <h1 style='color:#c0392b;'>Sorry, that slot was just taken!</h1>
@@ -18,6 +18,7 @@ if (isSlotBooked($pdo, $_POST['booking_date'], $_POST['booking_time'])) {
     ");
 }
 
+// Store booking data in session
 $_SESSION['pending_booking'] = [
     'service' => $_POST['service'],
     'total'   => $_POST['total_price'],
@@ -26,7 +27,8 @@ $_SESSION['pending_booking'] = [
     'email'   => $_POST['email'],
     'phone'   => $_POST['phone'],
     'date'    => $_POST['booking_date'],
-    'time'    => $_POST['booking_time']
+    'time'    => $_POST['booking_time'],
+    'notes'   => $_POST['special_notes'] ?? '' // Safely grab notes if they exist
 ];
 
 $b = $_SESSION['pending_booking'];

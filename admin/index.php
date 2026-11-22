@@ -153,7 +153,7 @@ if (isset($_POST['change_password'])) {
         if ($user && password_verify($current, $user['password_hash'])) {
             $update = $pdo->prepare("UPDATE admin_users SET password_hash = ? WHERE username = ?");
             $update->execute([password_hash($new, PASSWORD_DEFAULT), $_SESSION['admin_username']]);
-            $msg = "Password updated.";
+            $msg = "Password updated successfully.";
         } else {
             $msg = "Current password incorrect."; $msgType = 'error';
         }
@@ -170,22 +170,25 @@ $activeTab = $_GET['tab'] ?? 'bookings';
     <link rel="icon" type="image/svg+xml" href="../assets/images/logo.svg">
     <link rel="stylesheet" href="../assets/css/style.css">
     <style>
+        /* ─────────── ADMIN BASE STYLES ─────────── */
         body { background: #f4f6f9; display: flex; min-height: 100vh; margin: 0; }
         .sidebar { width: 260px; background: var(--black); color: white; padding: 30px 20px; min-height: 100vh; position: fixed; top:0; left:0; display: flex; flex-direction: column; }
-        .sidebar h2 { font-family: 'Cinzel', serif; color: var(--gold); margin-bottom: 40px; text-align: center; font-size: 1.6rem; }
-        .sidebar a { display: flex; align-items: center; gap: 12px; color: #bbb; text-decoration: none; padding: 14px 18px; border-radius: 8px; margin-bottom: 8px; font-weight: 600; transition: all 0.2s; }
+        .sidebar h2 { font-family: 'Cinzel', serif; color: var(--gold); margin-bottom: 40px; text-align: center; font-size: 1.6rem; letter-spacing: 2px;}
+        .sidebar a { display: flex; align-items: center; gap: 12px; color: #bbb; text-decoration: none; padding: 14px 18px; border-radius: 8px; margin-bottom: 8px; font-weight: 600; transition: all 0.2s; font-size: 0.95rem; }
         .sidebar a:hover, .sidebar a.active { background: rgba(255,255,255,0.08); color: var(--gold); }
-        .main-content { flex: 1; margin-left: 260px; padding: 40px; }
+        .sidebar a svg { width: 18px; height: 18px; stroke-width: 2; }
         
+        .main-content { flex: 1; margin-left: 260px; padding: 40px; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         .top-bar h1 { font-family: 'Cinzel', serif; font-size: 2rem; color: var(--black); margin: 0; }
         
-        .alert { padding: 15px; border-radius: 8px; margin-bottom: 25px; font-weight: bold; }
+        .alert { padding: 15px; border-radius: 8px; margin-bottom: 25px; font-weight: bold; font-size: 0.9rem; }
         .alert.success { background: #d4edda; color: #155724; border-left: 4px solid #27ae60; }
         .alert.error { background: #f8d7da; color: #721c24; border-left: 4px solid #c0392b; }
 
         .card { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); padding: 30px; margin-bottom: 30px; }
         
+        /* Tables */
         .table-responsive { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 15px; font-size: 0.8rem; text-transform: uppercase; color: #888; border-bottom: 2px solid #eee; }
@@ -197,6 +200,7 @@ $activeTab = $_GET['tab'] ?? 'bookings';
         .status-completed { background: #e8f5e9; color: #2e7d32; }
         .status-cancelled { background: #ffebee; color: #c62828; }
         
+        /* Buttons */
         .btn { padding: 10px 18px; border-radius: 6px; border: none; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: 0.2s; display: inline-block; text-decoration: none; }
         .btn-primary { background: var(--gold); color: white; }
         .btn-primary:hover { background: var(--gold-dark); }
@@ -204,33 +208,122 @@ $activeTab = $_GET['tab'] ?? 'bookings';
         .btn-danger:hover { background: #c62828; color: white; }
         .btn-sm { padding: 6px 12px; font-size: 0.75rem; }
         
+        /* Forms */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .form-grid .full { grid-column: 1 / -1; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 700; font-size: 0.85rem; color: #444; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 0.95rem; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--gold); }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.1); }
         
+        /* Service Cards in Admin */
         .svc-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
         .svc-admin-card { border: 1px solid #eee; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
         .svc-admin-header { display: flex; justify-content: space-between; align-items: start; }
         
+        /* Gallery Admin */
         .gallery-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
         .gallery-upload-box { border: 2px dashed #ccc; border-radius: 10px; padding: 20px; text-align: center; }
         .gallery-upload-box img { width: 100%; height: 120px; object-fit: cover; border-radius: 6px; margin-bottom: 10px; }
+
+        /* ─────────── BEAUTIFIED SETTINGS TAB ─────────── */
+        .settings-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .settings-card {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            border-top: 5px solid var(--gold);
+        }
+        .settings-card h3 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            color: var(--black);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .settings-card p.subtitle {
+            text-align: center;
+            color: var(--text-gray);
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+        .settings-card .form-group {
+            margin-bottom: 25px;
+        }
+        .settings-card .form-group label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--gold-dark);
+        }
+        .settings-card .btn-submit {
+            width: 100%;
+            background: var(--black);
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Cinzel', serif;
+            letter-spacing: 1px;
+            margin-top: 10px;
+        }
+        .settings-card .btn-submit:hover {
+            background: var(--gold);
+        }
+
+        /* Mobile Admin Fix */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; min-height: auto; position: relative; padding: 15px; flex-direction: row; flex-wrap: wrap; justify-content: center; }
+            .sidebar h2 { display: none; }
+            .sidebar a { margin: 5px; padding: 8px 12px; font-size: 0.8rem; }
+            .main-content { margin-left: 0; padding: 15px; }
+            .form-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
 
 <div class="sidebar">
     <h2>D'FACEEE</h2>
-    <a href="?tab=bookings" class="<?= $activeTab==='bookings'?'active':'' ?>">📅 Bookings</a>
-    <a href="?tab=availability" class="<?= $activeTab==='availability'?'active':'' ?>">🚫 Block Time</a>
-    <a href="?tab=services" class="<?= $activeTab==='services'?'active':'' ?>">💎 Services</a>
-    <a href="?tab=content" class="<?= $activeTab==='content'?'active':'' ?>">🖼️ Site Content</a>
-    <a href="?tab=password" class="<?= $activeTab==='password'?'active':'' ?>">⚙️ Settings</a>
-    <!-- Removed target="_blank" so it opens in the same tab -->
-    <a href="../index.php" style="margin-top: auto;">🌐 View Website</a>
-    <a href="logout.php" style="color: #e74c3c;">🚪 Logout</a>
+    
+    <!-- SVG Icons Added to Sidebar -->
+    <a href="?tab=bookings" class="<?= $activeTab==='bookings'?'active':'' ?>">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+        Bookings
+    </a>
+    <a href="?tab=availability" class="<?= $activeTab==='availability'?'active':'' ?>">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        Block Time
+    </a>
+    <a href="?tab=services" class="<?= $activeTab==='services'?'active':'' ?>">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+        Services
+    </a>
+    <a href="?tab=content" class="<?= $activeTab==='content'?'active':'' ?>">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+        Site Content
+    </a>
+    <a href="?tab=password" class="<?= $activeTab==='password'?'active':'' ?>">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        Settings
+    </a>
+    
+    <a href="../index.php" style="margin-top: auto;">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+        View Website
+    </a>
+    <a href="logout.php" style="color: #e74c3c;">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+        Logout
+    </a>
 </div>
 
 <div class="main-content">
@@ -517,16 +610,29 @@ $activeTab = $_GET['tab'] ?? 'bookings';
         </form>
     <?php endif; ?>
 
-    <!-- SETTINGS TAB -->
+    <!-- SETTINGS TAB (BEAUTIFIED) -->
     <?php if ($activeTab === 'password'): ?>
-        <div class="card" style="max-width: 500px;">
-            <h3 style="margin-bottom: 20px;">Change Password</h3>
-            <form method="POST">
-                <div class="form-group"><label>Current Password</label><input type="password" name="current_password" required></div>
-                <div class="form-group"><label>New Password</label><input type="password" name="new_password" required></div>
-                <div class="form-group"><label>Confirm New Password</label><input type="password" name="confirm_password" required></div>
-                <button type="submit" name="change_password" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Update Password</button>
-            </form>
+        <div class="settings-container">
+            <div class="settings-card">
+                <h3>Security Settings</h3>
+                <p class="subtitle">Update your admin password to keep your account secure.</p>
+                
+                <form method="POST">
+                    <div class="form-group">
+                        <label>Current Password</label>
+                        <input type="password" name="current_password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" name="new_password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm New Password</label>
+                        <input type="password" name="confirm_password" required>
+                    </div>
+                    <button type="submit" name="change_password" class="btn-submit">Update Password</button>
+                </form>
+            </div>
         </div>
     <?php endif; ?>
 </div>

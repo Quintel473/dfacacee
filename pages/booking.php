@@ -1,6 +1,6 @@
 <?php
 require '../includes/db.php';
-require '../includes/icons.php'; // Include SVG library
+require '../includes/icons.php';
 $pageTitle = "Book Appointment | D'FACEEE";
 include '../includes/header.php';
 
@@ -13,6 +13,8 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- Main Form Area -->
     <div class="booking-main">
         <div class="booking-container">
+            
+            <!-- Progress Bar -->
             <div class="progress-bar">
                 <div class="step active" id="step1-indicator">1</div>
                 <div class="step" id="step2-indicator">2</div>
@@ -35,7 +37,10 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <p class="svc-desc"><?php echo htmlspecialchars($svc['description']); ?></p>
                                 <div class="svc-meta">
                                     <span class="svc-price">$<?php echo number_format($svc['price'], 2); ?></span>
-                                    <span class="svc-duration"><?php echo htmlspecialchars($svc['duration']); ?></span>
+                                    <span class="svc-duration">
+                                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: text-top; margin-right: 3px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                        <?php echo htmlspecialchars($svc['duration']); ?>
+                                    </span>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -43,8 +48,12 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <input type="hidden" name="service" id="selectedService" required>
                     <input type="hidden" name="total_price" id="selectedPrice" required>
                     <input type="hidden" name="service_duration" id="selectedDuration" required>
+                    
                     <div class="btn-group">
-                        <button type="button" class="btn-next" onclick="nextStep(1)">Next: Date & Time</button>
+                        <button type="button" class="btn-next" onclick="nextStep(1)">
+                            Next: Date & Time
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: middle; margin-left: 5px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </button>
                     </div>
                 </div>
 
@@ -62,9 +71,16 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </select>
                         <small id="availabilityNote" style="display:none; color: var(--gold); font-size: 0.85rem; margin-top: 5px;"></small>
                     </div>
+                    
                     <div class="btn-group">
-                        <button type="button" class="btn-prev" onclick="prevStep(2)">Back</button>
-                        <button type="button" class="btn-next" onclick="nextStep(2)">Next: Your Details</button>
+                        <button type="button" class="btn-prev" onclick="prevStep(2)">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 5px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                            Back
+                        </button>
+                        <button type="button" class="btn-next" onclick="nextStep(2)">
+                            Next: Your Details
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: middle; margin-left: 5px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </button>
                     </div>
                 </div>
 
@@ -89,9 +105,16 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <label for="notes">Special Requests / Notes (Optional)</label>
                         <textarea id="notes" name="special_notes" rows="3" placeholder="Allergies, skin concerns, event type, inspiration photos..."></textarea>
                     </div>
+                    
                     <div class="btn-group">
-                        <button type="button" class="btn-prev" onclick="prevStep(3)">Back</button>
-                        <button type="button" class="btn-next" onclick="nextStep(3)">Review Booking</button>
+                        <button type="button" class="btn-prev" onclick="prevStep(3)">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 5px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                            Back
+                        </button>
+                        <button type="button" class="btn-next" onclick="nextStep(3)">
+                            Review Booking
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: middle; margin-left: 5px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </button>
                     </div>
                 </div>
 
@@ -99,7 +122,10 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="form-step" id="step4">
                     <h2 class="step-title">Review Your Booking</h2>
                     
-                    <div class="review-badge">Please confirm your details below</div>
+                    <div class="review-badge">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: text-bottom; margin-right: 5px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Please confirm your details below
+                    </div>
 
                     <div class="policy-box">
                         <strong>Booking Policy:</strong>
@@ -112,9 +138,16 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
 
                     <input type="hidden" name="deposit_paid" id="hiddenDeposit" value="0">
+                    
                     <div class="btn-group">
-                        <button type="button" class="btn-prev" onclick="prevStep(4)">Back</button>
-                        <button type="submit" class="btn-pay">Proceed to Payment →</button>
+                        <button type="button" class="btn-prev" onclick="prevStep(4)">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 5px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                            Back
+                        </button>
+                        <button type="submit" class="btn-pay">
+                            Proceed to Payment
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: middle; margin-left: 5px; pointer-events: none;"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </button>
                     </div>
                 </div>
             </form>

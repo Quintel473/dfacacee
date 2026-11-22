@@ -1,5 +1,14 @@
 let currentStep = 1;
-let bookingData = { service: '', price: 0, duration: '', date: '', time: '', name: '', email: '', phone: '' };
+let bookingData = { 
+    service: '', 
+    price: 0, 
+    duration: '',
+    date: '', 
+    time: '', 
+    name: '', 
+    email: '', 
+    phone: '' 
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     const today = new Date().toISOString().split('T')[0];
@@ -19,6 +28,7 @@ function selectService(card, serviceName, price, duration) {
     bookingData.price = parseFloat(price);
     bookingData.duration = duration;
     
+    // Update Sidebar
     document.getElementById('sideService').textContent = serviceName;
     document.getElementById('sideDuration').textContent = duration;
     document.getElementById('sidePrice').textContent = `$${bookingData.price.toFixed(2)}`;
@@ -26,6 +36,9 @@ function selectService(card, serviceName, price, duration) {
     const deposit = bookingData.price * 0.5;
     document.getElementById('sideDeposit').textContent = `$${deposit.toFixed(2)}`;
     document.getElementById('sideBalance').textContent = `$${(bookingData.price - deposit).toFixed(2)}`;
+    
+    // Update Hidden Deposit Input
+    document.getElementById('hiddenDeposit').value = deposit.toFixed(2);
 }
 
 function updateProgressBar(step) {
@@ -37,21 +50,31 @@ function updateProgressBar(step) {
 
 function showStep(step) {
     document.querySelectorAll('.form-step').forEach(el => el.classList.remove('active'));
-    document.getElementById(`step${step}`).classList.add('active');
+    const targetStep = document.getElementById(`step${step}`);
+    if (targetStep) targetStep.classList.add('active');
     updateProgressBar(step);
-    document.querySelector('.booking-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    const container = document.querySelector('.booking-container');
+    if (container) container.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function nextStep(current) {
-    if (current === 1 && !bookingData.service) { alert("Please select a service."); return; }
+    if (current === 1 && !bookingData.service) { 
+        alert("Please select a service."); 
+        return; 
+    }
     
     if (current === 2) {
         const date = document.getElementById('date').value;
         const time = document.getElementById('time').value;
-        if (!date || !time) { alert("Please select both a date and time."); return; }
+        if (!date || !time) { 
+            alert("Please select both a date and time."); 
+            return; 
+        }
         bookingData.date = date;
         bookingData.time = time;
         
+        // Update Sidebar
         document.getElementById('sideDate').textContent = new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const [h, m] = time.split(':');
         const hour = parseInt(h);
@@ -64,18 +87,13 @@ function nextStep(current) {
         const name = document.getElementById('name').value;
         const email = document.getElementById('email').value;
         const phone = document.getElementById('phone').value;
-        if (!name || !email || !phone) { alert("Please fill in your name, email, and phone."); return; }
+        if (!name || !email || !phone) { 
+            alert("Please fill in your name, email, and phone."); 
+            return; 
+        }
         bookingData.name = name; 
         bookingData.email = email; 
         bookingData.phone = phone;
-        
-        document.getElementById('reviewService').textContent = bookingData.service;
-        document.getElementById('reviewDate').textContent = `${bookingData.date} at ${bookingData.time}`;
-        document.getElementById('reviewPrice').textContent = `$${bookingData.price.toFixed(2)}`;
-        
-        const deposit = bookingData.price * 0.5;
-        document.getElementById('reviewDeposit').textContent = `$${deposit.toFixed(2)}`;
-        document.getElementById('hiddenDeposit').value = deposit.toFixed(2);
     }
     
     currentStep++;
@@ -88,7 +106,7 @@ function prevStep(current) {
 }
 
 /* ═══════════════════════════════════════════════
-   AVAILABILITY CHECK — UPDATED FOR YOUR HOURS
+   AVAILABILITY CHECK
    ═══════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
     const dateInput = document.getElementById('date');
@@ -97,11 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!dateInput || !timeSelect) return;
 
-    // YOUR WORKING HOURS: 5am-7am and 3pm-7pm
-    const ALL_SLOTS = [
-        '05:00', '06:00', '07:00', 
-        '15:00', '16:00', '17:00', '18:00', '19:00'
-    ];
+    // YOUR WORKING HOURS
+    const ALL_SLOTS = ['05:00', '06:00', '07:00', '15:00', '16:00', '17:00', '18:00', '19:00'];
 
     dateInput.addEventListener('change', () => {
         const date = dateInput.value;
@@ -110,13 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
         timeSelect.innerHTML = '<option value="">Loading...</option>';
         timeSelect.disabled = true;
 
-        // Fetches from actions folder
         fetch(`../actions/check_availability.php?date=${date}`)
             .then(res => res.json())
             .then(data => {
                 const booked = data.booked || [];
-                const blocked = data.blocked || []; // Future-proofing for Phase 2
-                
+                const blocked = data.blocked || [];
                 const unavailable = [...booked, ...blocked];
                 const available = ALL_SLOTS.filter(s => !unavailable.includes(s));
 
