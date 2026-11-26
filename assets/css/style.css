@@ -1099,3 +1099,45 @@ footer { text-align: center; padding: 40px 20px; color: var(--text-gray); font-s
         padding: 25px 20px;
     }
 }
+
+/* ═══════════════════════════════════════════════════════
+   MULTI-SELECT SERVICE CARDS
+   ═══════════════════════════════════════════════════════ */
+
+/* Ensure the card is a positioned container for the checkmark */
+.service-card {
+    position: relative;
+}
+
+/* Add the checkmark circle */
+.service-card::after {
+    content: '✓';
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 24px;
+    height: 24px;
+    background: var(--gold);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: var(--transition);
+}
+
+/* Show the checkmark when selected */
+.service-card.selected::after {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Adjust hover state to feel more interactive */
+.service-card:hover {
+    border-color: var(--gold);
+    background: #fcfaf5;
+}

@@ -26,10 +26,13 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 <!-- STEP 1: Select Service -->
                 <div class="form-step active" id="step1">
-                    <h2 class="step-title">Select Your Service</h2>
+                    <h2 class="step-title">Select Your Services</h2>
+                    <p style="text-align: center; color: var(--text-gray); margin-bottom: 20px; font-size: 0.9rem;">You can select more than one service</p>
+                    
                     <div class="service-grid">
                         <?php foreach($services as $svc): ?>
-                            <div class="service-card" onclick="selectService(this, '<?php echo htmlspecialchars($svc['name']); ?>', <?php echo $svc['price']; ?>, '<?php echo htmlspecialchars($svc['duration']); ?>')">
+                            <!-- Changed to toggleService to allow multiple selections -->
+                            <div class="service-card" onclick="toggleService(this, '<?php echo htmlspecialchars($svc['name']); ?>', <?php echo $svc['price']; ?>, '<?php echo htmlspecialchars($svc['duration']); ?>')">
                                 <div class="svc-icon">
                                     <?php echo getServiceIcon($svc['icon']); ?>
                                 </div>
@@ -45,6 +48,7 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </div>
                         <?php endforeach; ?>
                     </div>
+                    
                     <input type="hidden" name="service" id="selectedService" required>
                     <input type="hidden" name="total_price" id="selectedPrice" required>
                     <input type="hidden" name="service_duration" id="selectedDuration" required>
@@ -159,7 +163,7 @@ $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="summary-card">
             <h3>Booking Summary</h3>
             <div class="summary-item">
-                <span class="summary-label">Service</span>
+                <span class="summary-label">Service(s)</span>
                 <span class="summary-value" id="sideService">Not selected</span>
             </div>
             <div class="summary-item">

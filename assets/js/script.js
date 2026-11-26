@@ -1,8 +1,6 @@
 let currentStep = 1;
+let selectedServices = []; // Array to hold multiple services
 let bookingData = { 
-    service: '', 
-    price: 0, 
-    duration: '',
     date: '', 
     time: '', 
     name: '', 
@@ -16,29 +14,58 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dateEl) dateEl.setAttribute('min', today);
 });
 
-function selectService(card, serviceName, price, duration) {
-    document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
-    card.classList.add('selected');
+// Toggle service selection
+function toggleService(card, serviceName, price, duration) {
+    const index = selectedServices.findIndex(s => s.name === serviceName);
     
-    document.getElementById('selectedService').value = serviceName;
-    document.getElementById('selectedPrice').value = price;
-    document.getElementById('selectedDuration').value = duration;
+    if (index > -1) {
+        // Service already selected, remove it
+        selectedServices.splice(index, 1);
+        card.classList.remove('selected');
+    } else {
+        // Service not selected, add it
+        selectedServices.push({ name: serviceName, price: parseFloat(price), duration: duration });
+        card.classList.add('selected');
+    }
     
-    bookingData.service = serviceName;
-    bookingData.price = parseFloat(price);
-    bookingData.duration = duration;
+    updateBookingSummary();
+}
+
+function updateBookingSummary() {
+    let totalPrice = 0;
+    let totalDuration = 0;
+    let serviceNames = [];
+
+    selectedServices.forEach(svc => {
+        totalPrice += svc.price;
+        serviceNames.push(svc.name);
+        // Extract minutes from duration string (e.g., "60 mins" -> 60)
+        const mins = parseInt(svc.duration) || 0;
+        totalDuration += mins;
+    });
+
+    const deposit = totalPrice * 0.5;
     
-    // Update Sidebar
-    document.getElementById('sideService').textContent = serviceName;
-    document.getElementById('sideDuration').textContent = duration;
-    document.getElementById('sidePrice').textContent = `$${bookingData.price.toFixed(2)}`;
-    
-    const deposit = bookingData.price * 0.5;
-    document.getElementById('sideDeposit').textContent = `$${deposit.toFixed(2)}`;
-    document.getElementById('sideBalance').textContent = `$${(bookingData.price - deposit).toFixed(2)}`;
-    
-    // Update Hidden Deposit Input
+    // Format duration back to a string (e.g., 90 mins -> 1 hr 30 mins)
+    let durationText = `${totalDuration} mins`;
+    if (totalDuration >= 60) {
+        const hrs = Math.floor(totalDuration / 60);
+        const remMins = totalDuration % 60;
+        durationText = `${hrs} hr${hrs > 1 ? 's' : ''} ${remMins > 0 ? remMins + ' mins' : ''}`;
+    }
+
+    // Update Hidden Inputs
+    document.getElementById('selectedService').value = serviceNames.join(', ');
+    document.getElementById('selectedPrice').value = totalPrice.toFixed(2);
+    document.getElementById('selectedDuration').value = durationText;
     document.getElementById('hiddenDeposit').value = deposit.toFixed(2);
+
+    // Update Sidebar
+    document.getElementById('sideService').textContent = serviceNames.length > 0 ? serviceNames.join(', ') : 'None selected';
+    document.getElementById('sideDuration').textContent = totalDuration > 0 ? durationText : '-';
+    document.getElementById('sidePrice').textContent = `$${totalPrice.toFixed(2)}`;
+    document.getElementById('sideDeposit').textContent = `$${deposit.toFixed(2)}`;
+    document.getElementById('sideBalance').textContent = `$${(totalPrice - deposit).toFixed(2)}`;
 }
 
 function updateProgressBar(step) {
@@ -59,8 +86,8 @@ function showStep(step) {
 }
 
 function nextStep(current) {
-    if (current === 1 && !bookingData.service) { 
-        alert("Please select a service."); 
+    if (current === 1 && selectedServices.length === 0) { 
+        alert("Please select at least one service."); 
         return; 
     }
     
@@ -74,7 +101,6 @@ function nextStep(current) {
         bookingData.date = date;
         bookingData.time = time;
         
-        // Update Sidebar
         document.getElementById('sideDate').textContent = new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const [h, m] = time.split(':');
         const hour = parseInt(h);
@@ -115,7 +141,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!dateInput || !timeSelect) return;
 
-    // YOUR WORKING HOURS
     const ALL_SLOTS = ['05:00', '06:00', '07:00', '15:00', '16:00', '17:00', '18:00', '19:00'];
 
     dateInput.addEventListener('change', () => {
